@@ -2,6 +2,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt
 
+from mcts import MCTS # IMPORTAÇÃO DO MCTS AQUI
+import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
+
 from utils import GameExit
 
 from game import PopOutGame
@@ -12,6 +15,20 @@ console = Console()
 class GameInterface:
     def __init__(self):
         self.game = PopOutGame()
+        self.mcts = MCTS(simulations=500)
+
+        self.ai_strategies = {
+            "MCTS": self.mcts_ai,
+            "MCTS_Heuristico": self.mcts_heuristic_ai,
+            "Random": self.random_ai
+        }
+
+        self.player_ai = {}
+        self.player_types = {}
+
+       # self.ai_strategies["NovaIA"] = self.nova_funcao
+
+    
 
     # =========================================================
     # VISUALIZAÇÃO
@@ -30,7 +47,11 @@ class GameInterface:
             table.add_row(*[symbols[cell] for cell in row])
 
         console.print(table)
-        console.print(f"\n[bold magenta]Jogador atual: {symbols[self.game.current_player]}[/bold magenta]")
+
+        current = self.game.current_player
+        name = self.player_names[current]
+
+        console.print(f"\n[bold magenta]Turno: {name} ({symbols[current]})[/bold magenta]")
 
     # =========================================================
     # INPUT DO UTILIZADOR
@@ -65,19 +86,19 @@ class GameInterface:
                 else:
                     continue
 
-            # 🔹 valida número
+            # valida número
             try:
                 col = int(col)
             except:
                 console.print("[red]Coluna inválida[/red]")
                 continue
 
-            # 🔹 valida tipo de jogada
+            # valida tipo de jogada
             if move_type not in ["drop", "pop"]:
                 console.print("[red]Tipo inválido (use drop/pop)[/red]")
                 continue
 
-            # 🔹 valida jogada completa
+            # valida jogada completa
             if (move_type, col) in valid_moves:
                 return move_type, col
             else:
@@ -86,44 +107,109 @@ class GameInterface:
     # =========================================================
     # MODOS DE JOGO
     # =========================================================
+    def mcts_ai(self):
+        return self.mcts.search(self.game)
+    
+    def mcts_heuristic_ai(self):
+        # podes ter outro objeto ou parâmetro
+        return self.mcts.search(self.game)  # já usando heurísticas no mcts.py
+    
+    def choose_ai(self, player_label):
+        console.print(f"\n[bold cyan]Escolha IA {player_label}[/bold cyan]")
+        console.print("1 - MCTS")
+        console.print("2 - MCTS (Heurístico)")
+        console.print("3 - Aleatório")
+
+        choice = Prompt.ask("Opção", choices=["1", "2", "3"])
+
+        mapping = {
+            "1": "MCTS",
+            "2": "MCTS_Heuristico",
+            "3": "Random"
+        }
+
+        return mapping[choice]
 
     def choose_mode(self):
         console.print("\n[bold cyan]Escolha o modo de jogo:[/bold cyan]")
-        console.print("1 - Humano vs Humano")
-        console.print("2 - Humano vs IA")
+        console.print("1 - Humano_A vs Humano_B")
+        console.print("2 - Humano_A vs IA")
         console.print("3 - IA vs IA")
 
-        while True:
-            choice = Prompt.ask("Opção", choices=["1", "2", "3"])
-            return int(choice)
+        choice = Prompt.ask("Opção", choices=["1", "2", "3"])
+        return int(choice)
+        
+    def get_move(self):
+        player = self.game.current_player
+
+        if self.player_types[player] == "human":
+            return self.get_player_move()
+
+        elif self.player_types[player] == "ai":
+            ai_type = self.player_ai[player]
+
+            #TESTE DE TEMPO (OPCIONAL)
+            if ai_type == "MCTS":
+                time.sleep(0.8)
+
+            elif ai_type == "MCTS_Heuristico":
+                time.sleep(0.5)
+
+            elif ai_type == "Random":
+                time.sleep(0.2)
+
+            strategy = self.ai_strategies[ai_type]
+
+            return strategy()
+        
 
     # =========================================================
     # LOOP PRINCIPAL
     # =========================================================
+    
 
     def run(self):
         try:
             mode = self.choose_mode()
+            
+            # Reset jogo
+            self.game = PopOutGame()
 
-            console.print("\n[bold green]Iniciando jogo...[/bold green]\n")
+            if mode == 1:
+                self.player_types = {1: "human", 2: "human"}
+                self.player_names = {1: "Humano_A", 2: "Humano_B"}
+
+            elif mode == 2:
+                ai_type = self.choose_ai("Jogador 2")
+
+                self.player_types = {1: "human", 2: "ai"}
+                self.player_names = {1: "Humano_A", 2: ai_type}
+                self.player_ai = {2: ai_type}
+
+            elif mode == 3:
+                ai1 = self.choose_ai("Jogador 1")
+                ai2 = self.choose_ai("Jogador 2")
+
+                self.player_types = {1: "ai", 2: "ai"}
+                self.player_names = {1: ai1, 2: ai2}
+                self.player_ai = {1: ai1, 2: ai2}
 
             while True:
                 self.render_board()
 
+                current_name = self.player_names[self.game.current_player]
+                console.print(f"[dim]{current_name} está a jogar...[/dim]")
+
                 # -----------------------------
                 # ESCOLHER JOGADA
                 # -----------------------------
-                if mode == 1:
-                    move = self.get_player_move()
+                move = self.get_move()
 
-                elif mode == 2:
-                    if self.game.current_player == 1:
-                        move = self.get_player_move()
-                    else:
-                        move = self.random_ai()
-
-                elif mode == 3:
-                    move = self.random_ai()
+                if move is None:
+                    console.print("[red]Erro ao obter jogada[/red]")
+                    continue
+               # 
+                console.print(f"[bold]Jogada escolhida: {move}[/bold]")
 
                 move_type, col = move
                 self.game.make_move(move_type, col)
@@ -135,7 +221,9 @@ class GameInterface:
 
                 if winner:
                     self.render_board()
-                    console.print(f"[bold green]Jogador {winner} venceu![/bold green]")
+                    winner_name = self.player_names[winner]
+                    console.print(f"[bold green]{winner_name} venceu![/bold green]")
+                    
                     break
 
                 draw = self.game.check_draw()
@@ -155,7 +243,7 @@ class GameInterface:
             console.print("[dim]Obrigado por jogar PopOut![/dim]")
 
     # =========================================================
-    # IA SIMPLES (TEMPORÁRIA)
+    # Random SIMPLES (TEMPORÁRIA)
     # =========================================================
 
     def random_ai(self):
