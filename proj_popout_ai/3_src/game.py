@@ -112,10 +112,10 @@ class PopOutGame:
     # VERIFICAÇÃO DE VITÓRIA
     # =========================================================
 
-    def check_winner(self, last_move_type=None): # Verifica se há um vencedor, considerando a regra especial do POP
+    def check_winner(self, move_type=None): # Verifica se há um vencedor, considerando a regra especial do POP
 
         # Regra especial do POP
-        if last_move_type == 'pop':
+        if move_type == 'pop':
             if self._is_winning(self.opponent(self.current_player)):
                 return self.opponent(self.current_player)
 
@@ -205,7 +205,7 @@ if __name__ == "__main__":
                 print("[bold red]Jogada inválida![/bold red]")
                 continue
 
-            winner = game.check_winner(last_move_type=move_type)
+            winner = game.check_winner( move_type=move_type)
 
             if winner:
                 game.display()

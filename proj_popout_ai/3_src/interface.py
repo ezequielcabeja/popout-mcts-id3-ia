@@ -1,9 +1,14 @@
+from shutil import move
+
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt
 
 from mcts import MCTS # IMPORTAÇÃO DO MCTS AQUI
 import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
+from train_id3 import train # IMPORTAÇÃO DO TREINO DE ID3 (SE QUISERES USAR AQUI)
+import numpy as np # IMPORTAÇÃO DO NUMPY PARA PREPARAR FEATURES PARA ID3 (SE QUISERES USAR AQUI)
+import random
 
 from utils import GameExit
 
@@ -15,12 +20,19 @@ console = Console()
 class GameInterface:
     def __init__(self):
         self.game = PopOutGame()
-        self.mcts = MCTS(simulations=500)
+        self.mcts = MCTS(simulations=45)
+        self.mcts_heuristic = MCTS(simulations=10)
+
+        try: # TENTAR CARREGAR O MODELO ID3 TREINADO (SE EXISTIR)
+            self.id3_model = train()
+        except:
+            self.id3_model = None 
 
         self.ai_strategies = {
             "MCTS": self.mcts_ai,
             "MCTS_Heuristico": self.mcts_heuristic_ai,
-            "Random": self.random_ai
+            "Random": self.random_ai,
+            "ID3": self.id3_ai
         }
 
         self.player_ai = {}
@@ -28,8 +40,7 @@ class GameInterface:
 
        # self.ai_strategies["NovaIA"] = self.nova_funcao
 
-    
-
+       
     # =========================================================
     # VISUALIZAÇÃO
     # =========================================================
@@ -111,24 +122,42 @@ class GameInterface:
         return self.mcts.search(self.game)
     
     def mcts_heuristic_ai(self):
-        # podes ter outro objeto ou parâmetro
-        return self.mcts.search(self.game)  # já usando heurísticas no mcts.py
+        return self.mcts_heuristic.search(self.game)
     
     def choose_ai(self, player_label):
         console.print(f"\n[bold cyan]Escolha IA {player_label}[/bold cyan]")
         console.print("1 - MCTS")
         console.print("2 - MCTS (Heurístico)")
         console.print("3 - Aleatório")
+        console.print("4 - ID3 (Aprendido)")
 
-        choice = Prompt.ask("Opção", choices=["1", "2", "3"])
+        choice = Prompt.ask("Opção", choices=["1", "2", "3", "4"])
 
         mapping = {
             "1": "MCTS",
             "2": "MCTS_Heuristico",
-            "3": "Random"
-        }
+            "3": "Random",
+            "4": "ID3"
+            }
 
         return mapping[choice]
+    
+    def id3_ai(self):
+
+        if self.id3_model is None:
+            console.print("[red]ID3 não disponível → fallback[/red]")
+            return self.random_ai()
+        
+        features = self.game.board.flatten().reshape(1, -1)
+        prediction = self.id3_model.predict(features)[0]
+
+        move_type, col = prediction.split("_")
+        col = int(col)
+
+        if (move_type, col) in self.game.get_valid_moves():
+            return (move_type, col)
+        else:
+            return random.choice(self.game.get_valid_moves())
 
     def choose_mode(self):
         console.print("\n[bold cyan]Escolha o modo de jogo:[/bold cyan]")
@@ -149,14 +178,7 @@ class GameInterface:
             ai_type = self.player_ai[player]
 
             #TESTE DE TEMPO (OPCIONAL)
-            if ai_type == "MCTS":
-                time.sleep(0.8)
-
-            elif ai_type == "MCTS_Heuristico":
-                time.sleep(0.5)
-
-            elif ai_type == "Random":
-                time.sleep(0.2)
+            time.sleep(0.5) # pequena pausa para melhor experiência visual
 
             strategy = self.ai_strategies[ai_type]
 
@@ -169,6 +191,7 @@ class GameInterface:
     
 
     def run(self):
+        moves_count = 0 # CONTADOR DE JOGADAS PARA TESTES DE TEMPO (OPCIONAL)
         try:
             mode = self.choose_mode()
             
@@ -203,26 +226,36 @@ class GameInterface:
                 # -----------------------------
                 # ESCOLHER JOGADA
                 # -----------------------------
-                move = self.get_move()
+                move = self.get_move()   # PRIMEIRO obter jogada
 
+                # depois validar
                 if move is None:
                     console.print("[red]Erro ao obter jogada[/red]")
                     continue
+
+                valid_moves = self.game.get_valid_moves()
+
+                if move not in valid_moves:
+                    console.print("[yellow]Jogada inválida → fallback[/yellow]")
+                    move = random.choice(valid_moves)
                # 
                 console.print(f"[bold]Jogada escolhida: {move}[/bold]")
 
                 move_type, col = move
                 self.game.make_move(move_type, col)
+                moves_count += 1 # CONTADOR DE JOGADAS (OPCIONAL)
 
                 # -----------------------------
                 # RESULTADOS
                 # -----------------------------
-                winner = self.game.check_winner(last_move_type=move_type)
+                winner = self.game.check_winner(move_type=move_type) 
 
                 if winner:
                     self.render_board()
                     winner_name = self.player_names[winner]
-                    console.print(f"[bold green]{winner_name} venceu![/bold green]")
+                    symbol = "X" if winner == 1 else "O"
+                    console.print(f"[bold green]{winner_name} ({symbol}) venceu! 🏆[/bold green]")
+                    console.print(f"[cyan]Total de jogadas: {moves_count}[/cyan]")
                     
                     break
 
@@ -231,6 +264,7 @@ class GameInterface:
                 if draw:
                     self.render_board()
                     console.print("[bold red]Empate[/bold red]")
+                    console.print(f"[cyan]Total de jogadas: {moves_count}[/cyan]")
                     break
 
         except GameExit:
@@ -247,7 +281,6 @@ class GameInterface:
     # =========================================================
 
     def random_ai(self):
-        import random
         return random.choice(self.game.get_valid_moves())
 
 

@@ -29,7 +29,7 @@ class Node: # representa um estado do jogo
 
 
 class MCTS:
-    def __init__(self, simulations=1000):
+    def __init__(self, simulations=20):
         self.simulations = simulations
 
     def search(self, root_game):
@@ -74,6 +74,27 @@ class MCTS:
         best_child = max(root.children, key=lambda c: c.visits)
         return best_child.move
 
+    def heuristic_move(self, game):
+        moves = game.get_valid_moves()
+
+        # 1. Jogada vencedora imediata
+        for move in moves:
+            g = game.copy()
+            g.make_move(move[0], move[1])
+            if g.check_winner() == game.current_player:
+                return move
+
+        # 2. Bloquear adversário
+        opponent = 3 - game.current_player
+        for move in moves:
+            g = game.copy()
+            g.make_move(move[0], move[1])
+            if g.check_winner() == opponent:
+                return move
+
+        # 3. Caso contrário → random
+        return random.choice(moves)
+
     def simulate(self, game):
         while True:
             winner = game.check_winner()
@@ -84,8 +105,10 @@ class MCTS:
             if draw:
                 return None
 
-            moves = game.get_valid_moves()
-            move = random.choice(moves)
+            # usar heurística em vez de random puro
+            move = self.heuristic_move(game)
 
             game.make_move(move[0], move[1])
+            game.current_player = 3 - game.current_player
+
 
