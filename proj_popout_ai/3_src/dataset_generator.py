@@ -8,7 +8,7 @@ import random
 def board_to_features(board):
     return board.flatten().tolist()
 
-def generate_dataset(n_games=50):
+def generate_dataset(n_games=600):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
@@ -93,9 +93,9 @@ def generate_dataset(n_games=50):
     df = pd.DataFrame(data, columns=columns)
 
     #os.makedirs("1_data", exist_ok=True)
-    df.to_csv("../1_data/dataset.csv", index=False)
+    df.to_csv("../1_data/dataset_popout_game.csv", index=False)
     print("\n------------------------------")
-    print("Dataset criado!")
+    print("dataset_popout_game criado!")
     print("------------------------------\n")
 
     print(f"Total de jogadas geradas: {len(data)}")
@@ -116,4 +116,4 @@ def generate_dataset(n_games=50):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=50)
+    generate_dataset(n_games=600)
