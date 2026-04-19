@@ -29,7 +29,7 @@ class Node: # representa um estado do jogo
 
 
 class MCTS:
-    def __init__(self, simulations=20):
+    def __init__(self, simulations=500):
         self.simulations = simulations
 
     def search(self, root_game):

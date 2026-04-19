@@ -67,9 +67,9 @@ class PopOutGame:
                 moves.append(('drop', c))
 
         # Pops
-        for c in range(self.cols):
-            if self.board[self.rows - 1][c] == self.current_player:
-                moves.append(('pop', c))
+       # for c in range(self.cols):
+            #if self.board[self.rows - 1][c] == self.current_player:
+               # moves.append(('pop', c))
 
         return moves
 
@@ -163,7 +163,7 @@ class PopOutGame:
         state = self._get_state_key()
 
         # Regra 3: repetição
-        if self.history.get(state, 0) >= 3:
+        if self.history.get(state, 0) >= 10:  # Considerar empate após 10 repetições do mesmo estado
             return "draw_repetition"
 
         # Regra 2: tabuleiro cheio

@@ -8,12 +8,12 @@ import random
 def board_to_features(board):
     return board.flatten().tolist()
 
-def generate_dataset(n_games=2000):
+def generate_dataset(n_games=50):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
-    mcts = MCTS(simulations=45) # MCTS COM MENOS SIMULAÇÕES PARA GERAR MAIS RAPIDAMENTE
-    mcts_heuristic = MCTS(simulations=15)  # ou outro modo interno
+    mcts = MCTS(simulations=80) # MCTS COM MENOS SIMULAÇÕES PARA GERAR MAIS RAPIDAMENTE
+    mcts_heuristic = MCTS(simulations=40)  # ou outro modo interno
     
     print("\nA gerar dataset...")
     print("...........................\n")
@@ -45,14 +45,13 @@ def generate_dataset(n_games=2000):
 
             r = random.random()
 
-            if r < 0.6:
-                move = mcts.search(game)
-            elif r < 0.9:
-                move = mcts_heuristic.search(game)
+            if r < 0.05: # 5% de jogadas aleatórias para aumentar a diversidade do dataset
+                move = random.choice(game.get_valid_moves())
             else:
-               move = random.choice(game.get_valid_moves())
-
-            move_type, col = move
+                if moves_count < 10: # USAR HEURÍSTICA NAS PRIMEIRAS JOGADAS PARA GERAR MOVIMENTOS MAIS VARIADOS
+                    move = mcts_heuristic.search(game)
+                else:
+                    move = mcts.search(game) # USAR MCTS NORMAL APÓS AS PRIMEIRAS JOGADAS PARA GERAR MOVIMENTOS MAIS COMPETITIVOS
 
             move_type, col = move
 
@@ -81,8 +80,6 @@ def generate_dataset(n_games=2000):
                 draws += 1
                 break
 
-            game.current_player = 3 - game.current_player
-
     columns = [f"f{i}" for i in range(len(features))] + ["label"]
     df = pd.DataFrame(data, columns=columns)
 
@@ -110,4 +107,4 @@ def generate_dataset(n_games=2000):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=2000)
+    generate_dataset(n_games=50)
