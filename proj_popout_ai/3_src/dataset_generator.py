@@ -12,8 +12,8 @@ def generate_dataset(n_games=50):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
-    mcts = MCTS(simulations=80) # MCTS COM MENOS SIMULAÇÕES PARA GERAR MAIS RAPIDAMENTE
-    mcts_heuristic = MCTS(simulations=40)  # ou outro modo interno
+    mcts = MCTS(simulations=60) # MCTS COM MENOS SIMULAÇÕES PARA GERAR MAIS RAPIDAMENTE
+    mcts_heuristic = MCTS(simulations=25)  # ou outro modo interno
     
     print("\nA gerar dataset...")
     print("...........................\n")
@@ -35,29 +35,34 @@ def generate_dataset(n_games=50):
         game = PopOutGame()
 
         # alternar jogador inicial
-        if i % 2 == 1:
-           game.current_player = 2
+        if i % 2 == 0:
+            game.current_player = 1
+        else:
+            game.current_player = 2
 
         moves_count = 0
         
+        game_data = [] # PARA ARMAZENAR AS JOGADAS DE CADA JOGO SEPARADAMENTE, SE QUISERES ANALISAR DEPOIS
         while True:
             features = board_to_features(game.board)
 
             r = random.random()
 
-            if r < 0.05: # 5% de jogadas aleatórias para aumentar a diversidade do dataset
+            if r < 0.08: # 8% de jogadas aleatórias para aumentar a diversidade do dataset, especialmente no início do jogo, onde as jogadas são mais críticas e o MCTS pode ser menos eficaz devido à grande quantidade de possibilidades
                 move = random.choice(game.get_valid_moves())
             else:
-                if moves_count < 10: # USAR HEURÍSTICA NAS PRIMEIRAS JOGADAS PARA GERAR MOVIMENTOS MAIS VARIADOS
+                if moves_count < 12: # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS
+                    move = mcts_heuristic.search(game)
+                elif moves_count < 20: # MCTS HEURÍSTICO COM MENOS SIMULAÇÕES PARA AS JOGADAS INTERMEDIÁRIAS, POIS SÃO MENOS CRÍTICAS
                     move = mcts_heuristic.search(game)
                 else:
-                    move = mcts.search(game) # USAR MCTS NORMAL APÓS AS PRIMEIRAS JOGADAS PARA GERAR MOVIMENTOS MAIS COMPETITIVOS
+                    move = mcts.search(game) # MCTS COMPLETO PARA AS JOGADAS FINAIS, POIS SÃO AS MAIS CRÍTICAS PARA O RESULTADO FINAL
 
             move_type, col = move
 
             label = f"{move_type}_{col}"
 
-            data.append(features + [label])
+            data.append(features + [label]) 
 
             game.make_move(move_type, col)
             moves_count += 1
@@ -66,6 +71,8 @@ def generate_dataset(n_games=50):
             winner = game.check_winner(move_type)
             if winner:
                 total_moves += moves_count
+                for row in game_data: # ADICIONAR O RESULTADO DE CADA JOGO A CADA LINHA DO DATASET, PARA PODER ANALISAR DEPOIS
+                    data.append(row + [winner])
                 
                 if winner == 1:
                     wins_p1 += 1
@@ -78,6 +85,8 @@ def generate_dataset(n_games=50):
             if draw:
                 total_moves += moves_count # CONTAR A JOGADA QUE LEVOU AO EMPATE
                 draws += 1
+                for row in game_data:
+                    data.append(row + [0])
                 break
 
     columns = [f"f{i}" for i in range(len(features))] + ["label"]
