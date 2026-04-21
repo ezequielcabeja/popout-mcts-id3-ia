@@ -9,6 +9,7 @@ import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
 from train_id3 import train # IMPORTAÇÃO DO TREINO DE ID3 (SE QUISERES USAR AQUI)
 import numpy as np # IMPORTAÇÃO DO NUMPY PARA PREPARAR FEATURES PARA ID3 (SE QUISERES USAR AQUI)
 import random
+from mcts import MCTS, MCTS_Heuristic
 
 from utils import GameExit
 
@@ -21,7 +22,7 @@ class GameInterface:
     def __init__(self):
         self.game = PopOutGame()
         self.mcts = MCTS(iterations=500)
-        self.mcts_heuristic = MCTS(iterations=1000)
+        self.mcts_heuristic = MCTS_Heuristic(iterations=1000)
 
         try: # TENTAR CARREGAR O MODELO ID3 TREINADO (SE EXISTIR)
             self.id3_model = train()
@@ -119,10 +120,10 @@ class GameInterface:
     # MODOS DE JOGO
     # =========================================================
     def mcts_ai(self):
-        return self.mcts.search(self.game)
-    
+        return self.mcts.get_best_move(self.game)
+
     def mcts_heuristic_ai(self):
-        return self.mcts_heuristic.search(self.game)
+        return self.mcts_heuristic.get_best_move(self.game)
     
     def choose_ai(self, player_label):
         console.print(f"\n[bold cyan]Escolha IA {player_label}[/bold cyan]")

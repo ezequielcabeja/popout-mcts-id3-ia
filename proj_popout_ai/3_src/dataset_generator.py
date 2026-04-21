@@ -4,6 +4,7 @@ from mcts import MCTS
 import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
 #import os # IMPORTAÇÃO DE OS PARA VER SE O DATASET EXISTE (OPCIONAL)
 import random
+from mcts import MCTS, MCTS_Heuristic
 
 def board_to_features(board):
     return board.flatten().tolist()
@@ -12,8 +13,8 @@ def generate_dataset(n_games=600):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
-    mcts = MCTS(simulations=60) # MCTS COM MENOS SIMULAÇÕES PARA GERAR MAIS RAPIDAMENTE
-    mcts_heuristic = MCTS(simulations=25)  # ou outro modo interno
+    mcts = MCTS(iterations=1000)
+    mcts_heuristic = MCTS_Heuristic(iterations=500)  # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS E O MCTS COMPLETO PODE SER MUITO LENTO DEVIDO À GRANDE QUANTIDADE DE POSSIBILIDADES
     
     print("\nA gerar dataset...")
     print("...........................\n")
@@ -52,17 +53,17 @@ def generate_dataset(n_games=600):
                 move = random.choice(game.get_valid_moves())
             else:
                 if moves_count < 12: # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS
-                    move = mcts_heuristic.search(game)
+                    move = mcts_heuristic.get_best_move(game)
                 elif moves_count < 20: # MCTS HEURÍSTICO COM MENOS SIMULAÇÕES PARA AS JOGADAS INTERMEDIÁRIAS, POIS SÃO MENOS CRÍTICAS
-                    move = mcts_heuristic.search(game)
+                    move = mcts_heuristic.get_best_move(game)
                 else:
-                    move = mcts.search(game) # MCTS COMPLETO PARA AS JOGADAS FINAIS, POIS SÃO AS MAIS CRÍTICAS PARA O RESULTADO FINAL
+                    move = mcts.get_best_move(game) # MCTS COMPLETO PARA AS JOGADAS FINAIS, POIS SÃO AS MAIS CRÍTICAS PARA O RESULTADO FINAL
 
             move_type, col = move
 
             label = f"{move_type}_{col}"
 
-            data.append(features + [label]) 
+            game_data.append(features + [label])
 
             game.make_move(move_type, col)
             moves_count += 1
@@ -89,7 +90,7 @@ def generate_dataset(n_games=600):
                     data.append(row + [0])
                 break
 
-    columns = [f"f{i}" for i in range(len(features))] + ["label"]
+    columns = [f"f{i}" for i in range(len(features))] + ["label", "winner"]
     df = pd.DataFrame(data, columns=columns)
 
     #os.makedirs("1_data", exist_ok=True)
@@ -116,4 +117,4 @@ def generate_dataset(n_games=600):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=30)
+    generate_dataset(n_games=2)

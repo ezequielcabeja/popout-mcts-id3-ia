@@ -67,9 +67,9 @@ class PopOutGame:
                 moves.append(('drop', c))
 
         # Pops
-       # for c in range(self.cols):
-            #if self.board[self.rows - 1][c] == self.current_player:
-               # moves.append(('pop', c))
+        for c in range(self.cols):
+            if self.board[self.rows - 1][c] == self.current_player:
+               moves.append(('pop', c))
 
         return moves
 
