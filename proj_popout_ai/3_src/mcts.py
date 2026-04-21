@@ -3,112 +3,292 @@ import random
 import math
 from game import PopOutGame
 
+import pickle
+from datetime import datetime
 
-class Node: # representa um estado do jogo
-    def __init__(self, game, parent=None, move=None):
-        self.game = game
+
+class MCTSNode:
+    """Nó da árvore MCTS"""
+
+    def __init__(self, game_state, parent=None, move=None):
+        self.game_state = game_state
         self.parent = parent
         self.move = move
-
         self.children = []
         self.visits = 0
         self.wins = 0
+        self.untried_moves = game_state.get_valid_moves()
 
-    def is_fully_expanded(self): # verifica se todas as jogadas possíveis já foram exploradas
-        return len(self.children) == len(self.game.get_valid_moves())
+    def uct_value(self, exploration_constant=1.20):#testar valores diferentes!!
+        if self.visits == 0:
+            return float('inf')
 
-    def best_child(self, c_param=1.4): # calcula o UCT para cada filho e retorna o que tem o maior valor
-        choices = []
+        exploitation = self.wins / self.visits
+        exploration = exploration_constant * math.sqrt(math.log(self.parent.visits) / self.visits)
 
-        for child in self.children:
-            uct = (child.wins / (child.visits + 1e-6)) + \
-                  c_param * math.sqrt(math.log(self.visits + 1) / (child.visits + 1e-6))
-            choices.append(uct)
+        if self.game_state.current_player != self.parent.game_state.current_player:
+            exploitation = 1 - exploitation
 
-        return self.children[choices.index(max(choices))]
+        return exploitation + exploration
+
+    def expand(self):
+        move = random.choice(self.untried_moves)
+        self.untried_moves.remove(move)
+
+        new_game = self.game_state.copy()
+        new_game.make_move(move[0], move[1])
+
+        child_node = MCTSNode(new_game, parent=self, move=move)
+        self.children.append(child_node)
+        return child_node
+
+    def is_fully_expanded(self):
+        return len(self.untried_moves) == 0
+
+    def best_child(self, exploration_constant=1.20):
+        return max(self.children, key=lambda c: c.uct_value(exploration_constant))
+
+    def update(self, result):
+        self.visits += 1
+        self.wins += result
 
 
 class MCTS:
-    def __init__(self, simulations=500):
-        self.simulations = simulations
+    def __init__(self, iterations=700, exploration_constant=1.20):
+        self.iterations = iterations
+        self.exploration_constant = exploration_constant
+        self.dataset = []  # (state, move) para decision tree
 
-    def search(self, root_game):
-        root = Node(root_game.copy())
+    def select(self, node):
+        while not node.game_state.check_winner() and node.game_state.get_valid_moves(): #Enquanto o jogo não acabou E ainda existem movimentos possíveis:
+            if not node.is_fully_expanded(): #Se o nó atual tem movimentos que ainda não foram explorados:
+                return node.expand()
+            else:
+                node = node.best_child(self.exploration_constant)
+        return node
 
-        for _ in range(self.simulations):
-            node = root
+    def simulate(self, game_state):
+        sim_game = game_state.copy()
+        starting_player = game_state.current_player
+        move_count = 0
+        max_moves = 50
 
-            # 1. SELECTION
-            while node.children and node.is_fully_expanded():
-                node = node.best_child()
+        while move_count < max_moves:
+            winner = sim_game.check_winner()
+            if winner is not None:
+                break
 
-            # 2. EXPANSION
-            if not node.is_fully_expanded():
-                moves = node.game.get_valid_moves()
+            moves = sim_game.get_valid_moves()
+            if not moves:
+                break
 
-                tried_moves = [child.move for child in node.children]
-                for move in moves:
-                    if move not in tried_moves:
-                        new_game = node.game.copy()
-                        new_game.make_move(move[0], move[1])
+            # 🎲 MCTS puro: escolha completamente aleatória
+            move = random.choice(moves)
 
-                        child = Node(new_game, parent=node, move=move)
-                        node.children.append(child)
-                        node = child
-                        break
+            sim_game.make_move(move[0], move[1])
+            move_count += 1
 
-            # 3. SIMULATION
-            result = self.simulate(node.game.copy())
+        winner = sim_game.check_winner()
 
-            # 4. BACKPROPAGATION
-            while node is not None:
-                node.visits += 1
+        # 🤝 empate neutro (melhor que 0 puro)
+        if winner is None:
+            return 0.5
 
-                # vitória do jogador inicial
-                if result == root_game.current_player:
-                    node.wins += 1
+        return 1 if winner == starting_player else 0
 
-                node = node.parent
+    def backpropagate(self, node, result):
+        while node is not None:
+            node.update(result)
+            result = 1 - result
+            node = node.parent
 
-        # escolher melhor jogada
-        best_child = max(root.children, key=lambda c: c.visits)
-        return best_child.move
+    def get_best_move(self, game_state, return_confidence=False):
+        root = MCTSNode(game_state)
 
-    def heuristic_move(self, game):
-        moves = game.get_valid_moves()
+        for _ in range(self.iterations):
+            node = self.select(root)
+            result = self.simulate(node.game_state)
+            self.backpropagate(node, result)
 
-        # 1. Jogada vencedora imediata
-        for move in moves:
-            g = game.copy()
-            g.make_move(move[0], move[1])
-            if g.check_winner() == game.current_player:
-                return move
-
-        # 2. Bloquear adversário
-        opponent = 3 - game.current_player
-        for move in moves:
-            g = game.copy()
-            g.make_move(move[0], move[1])
-            if g.check_winner() == opponent:
-                return move
-
-        # 3. Caso contrário → random
-        return random.choice(moves)
-
-    def simulate(self, game):
-        while True:
-            winner = game.check_winner()
-            if winner:
-                return winner
-
-            draw = game.check_draw()
-            if draw:
+        if not root.children:
+            moves = game_state.get_valid_moves()
+            if moves:
+                best_move = moves[0]
+                confidence = 0
+            else:
                 return None
+        else:
+            best_child = max(root.children, key=lambda c: c.visits)
+            best_move = best_child.move
+            confidence = best_child.wins / best_child.visits if best_child.visits > 0 else 0
 
-            # usar heurística em vez de random puro
-            move = self.heuristic_move(game)
+        # Salvar no dataset
+        self._add_to_dataset(game_state, best_move)
 
-            game.make_move(move[0], move[1])
-            game.current_player = 3 - game.current_player
+        if return_confidence:
+            return best_move, confidence
+        return best_move
+
+    def _add_to_dataset(self, game_state, move):
+        """Adiciona par (estado, movimento) ao dataset"""
+        state_key = {
+            'board': game_state.board.tolist(),
+            'current_player': game_state.current_player
+        }
+
+        self.dataset.append({
+            'state': state_key,
+            'move': move
+        })
+
+    def save_dataset(self, filename=None):
+        if filename is None:
+            filename = f"mcts_dataset_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+
+        with open(filename, 'wb') as f:
+            pickle.dump(self.dataset, f)
+
+        print(f"✅ Dataset salvo em {filename} com {len(self.dataset)} exemplos")
+        return filename
 
 
+class MCTS_Heuristic(MCTS):
+    """
+    MCTS com heurística OTIMIZADA
+
+    """
+
+    def _count_pieces_in_direction(self, board, row, col, player, dr, dc):
+        """Conta peças consecutivas em uma direção"""
+        count = 0
+        r, c = row + dr, col + dc
+        rows, cols = len(board), len(board[0])
+
+        while 0 <= r < rows and 0 <= c < cols and board[r][c] == player:
+            count += 1
+            r += dr
+            c += dc
+
+        return count
+
+    def _evaluate_move_fast(self, game_state, move, player):
+        """
+        Avalia movimento rapidamente (sem cópia!)
+        """
+        board = game_state.board
+        col = move[1]
+
+        # Encontrar linha onde a peça cairia
+        row = -1
+        for r in range(game_state.rows - 1, -1, -1):
+            if board[r][col] == 0:
+                row = r
+                break
+
+        if row == -1:
+            return -1000  # Movimento inválido
+
+        # 1. VITÓRIA IMEDIATA?
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dr, dc in directions:
+            count = 1
+            count += self._count_pieces_in_direction(board, row, col, player, dr, dc)
+            count += self._count_pieces_in_direction(board, row, col, player, -dr, -dc)
+
+            if count >= 4:
+                return 10000  # Vitória!
+
+        # 2. BLOQUEIO? (verificar se oponente venceria)
+        opponent = 3 - player
+        for dr, dc in directions:
+            count = 1
+            count += self._count_pieces_in_direction(board, row, col, opponent, dr, dc)
+            count += self._count_pieces_in_direction(board, row, col, opponent, -dr, -dc)
+
+            if count >= 3:  # Se oponente tem 3, precisa bloquear
+                return 9000
+
+        # 3. Avaliar ameaças (3 em linha, 2 em linha)
+        score = 0
+        for dr, dc in directions:
+            count = 1
+            count += self._count_pieces_in_direction(board, row, col, player, dr, dc)
+            count += self._count_pieces_in_direction(board, row, col, player, -dr, -dc)
+
+            if count == 3:
+                score += 100
+            elif count == 2:
+                score += 10
+            elif count == 1:
+                score += 1
+
+        # 4. Bônus por posição (centro é melhor)
+        if col == 3:
+            score += 5
+        elif col in [2, 4]:
+            score += 3
+        elif col in [1, 5]:
+            score += 1
+
+        # 5. Bônus por altura (quanto mais baixo, melhor)
+        score += (game_state.rows - row) * 2
+
+        return score
+
+    def simulate(self, game_state):
+        sim_game = game_state.copy()
+        move_count = 0
+        max_moves = 50
+
+        while move_count < max_moves:
+            winner = sim_game.check_winner()
+            if winner is not None:
+                break
+
+            moves = sim_game.get_valid_moves()
+            if not moves:
+                break
+
+            scored_moves = []
+            for move in moves:
+                score = self._evaluate_move_fast(sim_game, move, sim_game.current_player)
+                scored_moves.append((score, move))
+
+            best_move = max(scored_moves, key=lambda x: x[0])[1]
+
+            if random.random() < 0.6:
+                move = best_move
+            else:
+                move = random.choice(scored_moves[:3])[1]
+
+            sim_game.make_move(move[0], move[1])
+            move_count += 1
+
+        winner = sim_game.check_winner()
+
+        if winner is None:
+            return 0.5
+
+        return 1 if winner == game_state.current_player else 0
+
+class PopOutAI:
+    """Wrapper para usar MCTS no jogo"""
+
+    def __init__(self, algorithm='mcts', iterations=500):
+        if algorithm == 'mcts':
+            self.mcts = MCTS(iterations=iterations)
+        elif algorithm == 'mcts_heuristic':
+            self.mcts = MCTS_Heuristic(iterations=iterations)
+        else:
+            self.mcts = MCTS(iterations=iterations)
+
+        self.algorithm_name = algorithm
+
+    def get_move(self, game_state, return_confidence=False):
+        return self.mcts.get_best_move(game_state, return_confidence)
+
+    def save_dataset(self, filename=None):
+        return self.mcts.save_dataset(filename)
+
+    def get_dataset(self):
+        return self.mcts.dataset

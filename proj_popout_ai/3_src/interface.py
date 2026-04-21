@@ -20,8 +20,8 @@ console = Console()
 class GameInterface:
     def __init__(self):
         self.game = PopOutGame()
-        self.mcts = MCTS(simulations=60)
-        self.mcts_heuristic = MCTS(simulations=25)
+        self.mcts = MCTS(iterations=500)
+        self.mcts_heuristic = MCTS(iterations=1000)
 
         try: # TENTAR CARREGAR O MODELO ID3 TREINADO (SE EXISTIR)
             self.id3_model = train()

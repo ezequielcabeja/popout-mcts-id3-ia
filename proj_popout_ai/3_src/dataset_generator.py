@@ -116,4 +116,4 @@ def generate_dataset(n_games=600):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=600)
+    generate_dataset(n_games=30)
