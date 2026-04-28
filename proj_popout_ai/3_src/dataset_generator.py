@@ -13,8 +13,8 @@ def generate_dataset(n_games=600):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
-    mcts = MCTS(iterations=60)
-    mcts_heuristic = MCTS_Heuristic(iterations=20)  # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS E O MCTS COMPLETO PODE SER MUITO LENTO DEVIDO À GRANDE QUANTIDADE DE POSSIBILIDADES
+    mcts = MCTS(iterations=70)
+    mcts_heuristic = MCTS_Heuristic(iterations=40)  # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS E O MCTS COMPLETO PODE SER MUITO LENTO DEVIDO À GRANDE QUANTIDADE DE POSSIBILIDADES
     
     print("\nA gerar dataset...")
     print("...........................\n")
@@ -47,10 +47,23 @@ def generate_dataset(n_games=600):
         while True:
             features = board_to_features(game.board)
 
-            if random.random() < 0.7:
+            #if random.random() < 0.7:
+             #   move = mcts.get_best_move(game)
+            #else:
+             #   move = mcts_heuristic.get_best_move(game)
+
+            r = random.random()
+            if r < 0.05:
+                    # 5% de chance de uma jogada completamente aleatória
+                move = random.choice(game.get_valid_moves())
+            elif r < 0.715:  # Corresponde a 0.05 (aleatório) + 0.665 (MCTS padrão)
+                    # 66.5% de chance de usar o MCTS padrão
                 move = mcts.get_best_move(game)
             else:
+                    # 28.5% de chance de usar o MCTS com heurística
                 move = mcts_heuristic.get_best_move(game)
+            
+
             move_type, col = move
 
             label = f"{move_type}_{col}"
@@ -86,7 +99,7 @@ def generate_dataset(n_games=600):
     df = pd.DataFrame(data, columns=columns)
 
     #os.makedirs("1_data", exist_ok=True)
-    df.to_csv("../1_data/dataset_popout_game_1.csv", index=False)
+    df.to_csv("../1_data/dataset_popout_game_2.csv", index=False)
     print("\n------------------------------")
     print("dataset_popout_game criado!")
     print("------------------------------\n")
@@ -109,4 +122,4 @@ def generate_dataset(n_games=600):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=50)
+    generate_dataset(n_games=600)
