@@ -67,7 +67,7 @@ class PopOutGame:
                 moves.append(('drop', c))
 
         # Pops
-        for c in range(self.cols):
+        for c in range(self.cols): 
             if self.board[self.rows - 1][c] == self.current_player:
                moves.append(('pop', c))
 
@@ -85,7 +85,7 @@ class PopOutGame:
                     break
 
         # POP
-        elif move_type == 'pop':
+        elif move_type == 'pop': 
             for r in range(self.rows - 1, 0, -1):
                 self.board[r][col] = self.board[r - 1][col]
             self.board[0][col] = 0
@@ -115,7 +115,7 @@ class PopOutGame:
     def check_winner(self, move_type=None): # Verifica se há um vencedor, considerando a regra especial do POP
 
         # Regra especial do POP
-        if move_type == 'pop':
+        if move_type == 'pop': 
             if self._is_winning(self.opponent(self.current_player)):
                 return self.opponent(self.current_player)
 
@@ -125,7 +125,7 @@ class PopOutGame:
             return None
 
         # Verificação normal
-        for p in [1, 2]:
+        for p in [1, 2]: # Verificar ambos os jogadores, pois o POP pode criar uma situação onde ambos ganham ao mesmo tempo. Nesse caso, o jogador que fez o POP vence, mas é importante verificar ambos para garantir que a lógica de vitória está correta.
             if self._is_winning(p):
                 return p
 
@@ -163,7 +163,7 @@ class PopOutGame:
         state = self._get_state_key()
 
         # Regra 3: repetição
-        if self.history.get(state, 0) >= 10:  # Considerar empate após 10 repetições do mesmo estado
+        if self.history.get(state, 0) >= 10:  # Considerar empate após 5 repetições do mesmo estado
             return "draw_repetition"
 
         # Regra 2: tabuleiro cheio

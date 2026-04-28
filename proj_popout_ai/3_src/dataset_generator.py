@@ -13,8 +13,8 @@ def generate_dataset(n_games=600):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
 
     data = []
-    mcts = MCTS(iterations=1000)
-    mcts_heuristic = MCTS_Heuristic(iterations=500)  # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS E O MCTS COMPLETO PODE SER MUITO LENTO DEVIDO À GRANDE QUANTIDADE DE POSSIBILIDADES
+    mcts = MCTS(iterations=60)
+    mcts_heuristic = MCTS_Heuristic(iterations=20)  # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS E O MCTS COMPLETO PODE SER MUITO LENTO DEVIDO À GRANDE QUANTIDADE DE POSSIBILIDADES
     
     print("\nA gerar dataset...")
     print("...........................\n")
@@ -25,7 +25,7 @@ def generate_dataset(n_games=600):
 
     total_moves = 0 # CONTADOR DE JOGADAS PARA CALCULAR MÉDIA DE JOGADAS POR JOGO
 
-    for i in range(n_games):
+    for i in range(n_games): # GERAR N JOGOS PARA O DATASET
         if i == 0:
             print(f"Jogo {i+1}/{n_games}")
         elif i == 9:
@@ -47,18 +47,10 @@ def generate_dataset(n_games=600):
         while True:
             features = board_to_features(game.board)
 
-            r = random.random()
-
-            if r < 0.08: # 8% de jogadas aleatórias para aumentar a diversidade do dataset, especialmente no início do jogo, onde as jogadas são mais críticas e o MCTS pode ser menos eficaz devido à grande quantidade de possibilidades
-                move = random.choice(game.get_valid_moves())
+            if random.random() < 0.7:
+                move = mcts.get_best_move(game)
             else:
-                if moves_count < 12: # MCTS HEURÍSTICO PARA AS PRIMEIRAS JOGADAS, POIS SÃO MAIS CRÍTICAS
-                    move = mcts_heuristic.get_best_move(game)
-                elif moves_count < 20: # MCTS HEURÍSTICO COM MENOS SIMULAÇÕES PARA AS JOGADAS INTERMEDIÁRIAS, POIS SÃO MENOS CRÍTICAS
-                    move = mcts_heuristic.get_best_move(game)
-                else:
-                    move = mcts.get_best_move(game) # MCTS COMPLETO PARA AS JOGADAS FINAIS, POIS SÃO AS MAIS CRÍTICAS PARA O RESULTADO FINAL
-
+                move = mcts_heuristic.get_best_move(game)
             move_type, col = move
 
             label = f"{move_type}_{col}"
@@ -94,7 +86,7 @@ def generate_dataset(n_games=600):
     df = pd.DataFrame(data, columns=columns)
 
     #os.makedirs("1_data", exist_ok=True)
-    df.to_csv("../1_data/dataset_popout_game.csv", index=False)
+    df.to_csv("../1_data/dataset_popout_game_1.csv", index=False)
     print("\n------------------------------")
     print("dataset_popout_game criado!")
     print("------------------------------\n")
@@ -117,4 +109,4 @@ def generate_dataset(n_games=600):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=2)
+    generate_dataset(n_games=50)

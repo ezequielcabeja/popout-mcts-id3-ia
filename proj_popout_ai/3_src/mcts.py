@@ -10,7 +10,7 @@ from datetime import datetime
 class MCTSNode:
     """Nó da árvore MCTS"""
 
-    def __init__(self, game_state, parent=None, move=None):
+    def __init__(self, game_state, parent=None, move=None, root_player=None):
         self.game_state = game_state
         self.parent = parent
         self.move = move
@@ -19,15 +19,21 @@ class MCTSNode:
         self.wins = 0
         self.untried_moves = game_state.get_valid_moves()
 
-    def uct_value(self, exploration_constant=1.20):#testar valores diferentes!!
+        if root_player is not None:
+            self.root_player = root_player
+        elif parent is not None:
+            self.root_player = parent.root_player
+        else:
+            self.root_player = None
+
+    def uct_value(self, exploration_constant=1.41):#testar valores diferentes!!
         if self.visits == 0:
             return float('inf')
 
         exploitation = self.wins / self.visits
-        exploration = exploration_constant * math.sqrt(math.log(self.parent.visits) / self.visits)
-
-        if self.game_state.current_player != self.parent.game_state.current_player:
-            exploitation = 1 - exploitation
+        exploration = exploration_constant * math.sqrt(
+            math.log(self.parent.visits + 1) / self.visits
+        )
 
         return exploitation + exploration
 
@@ -38,7 +44,7 @@ class MCTSNode:
         new_game = self.game_state.copy()
         new_game.make_move(move[0], move[1])
 
-        child_node = MCTSNode(new_game, parent=self, move=move)
+        child_node = MCTSNode(new_game, parent=self, move=move, root_player=self.root_player)
         self.children.append(child_node)
         return child_node
 
@@ -54,7 +60,7 @@ class MCTSNode:
 
 
 class MCTS:
-    def __init__(self, iterations=700, exploration_constant=1.20):
+    def __init__(self, iterations=700, exploration_constant=1.41):
         self.iterations = iterations
         self.exploration_constant = exploration_constant
         self.dataset = []  # (state, move) para decision tree
@@ -67,11 +73,11 @@ class MCTS:
                 node = node.best_child(self.exploration_constant)
         return node
 
-    def simulate(self, game_state):
+    def simulate(self, game_state, root_player):
         sim_game = game_state.copy()
-        starting_player = game_state.current_player
+        
         move_count = 0
-        max_moves = 50
+        max_moves = 200
 
         while move_count < max_moves:
             winner = sim_game.check_winner()
@@ -82,32 +88,44 @@ class MCTS:
             if not moves:
                 break
 
-            # 🎲 MCTS puro: escolha completamente aleatória
-            move = random.choice(moves)
+            if move_count < 10:
+                drop_moves = [m for m in moves if m[0] == 'drop']
+                if drop_moves:
+                    moves = drop_moves
+
+            # Ordenar por proximidade ao centro
+            moves_sorted = sorted(moves, key=lambda m: abs(m[1] - (sim_game.cols // 2)))
+            
+            # Escolher uma das 3 melhores jogadas com maior probabilidade
+            if random.random() < 0.8 and len(moves_sorted) > 0:
+                move = random.choice(moves_sorted[:min(3, len(moves_sorted))])
+            else:
+                move = random.choice(moves)
 
             sim_game.make_move(move[0], move[1])
             move_count += 1
 
         winner = sim_game.check_winner()
 
-        # 🤝 empate neutro (melhor que 0 puro)
         if winner is None:
             return 0.5
 
-        return 1 if winner == starting_player else 0
+        return 1 if winner == root_player else 0
 
     def backpropagate(self, node, result):
         while node is not None:
-            node.update(result)
-            result = 1 - result
+            node.visits += 1
+            node.wins += result
+            result = 1 - result  
             node = node.parent
 
     def get_best_move(self, game_state, return_confidence=False):
-        root = MCTSNode(game_state)
+        root_player = game_state.current_player   #NOVO
+        root = MCTSNode(game_state, root_player=root_player)
 
         for _ in range(self.iterations):
             node = self.select(root)
-            result = self.simulate(node.game_state)
+            result = self.simulate(node.game_state, root_player)
             self.backpropagate(node, result)
 
         if not root.children:
@@ -123,7 +141,7 @@ class MCTS:
             confidence = best_child.wins / best_child.visits if best_child.visits > 0 else 0
 
         # Salvar no dataset
-        self._add_to_dataset(game_state, best_move)
+        #self._add_to_dataset(game_state, best_move)
 
         if return_confidence:
             return best_move, confidence
@@ -148,7 +166,7 @@ class MCTS:
         with open(filename, 'wb') as f:
             pickle.dump(self.dataset, f)
 
-        print(f"✅ Dataset salvo em {filename} com {len(self.dataset)} exemplos")
+        print(f"Dataset salvo em {filename} com {len(self.dataset)} exemplos")
         return filename
 
 
@@ -190,13 +208,13 @@ class MCTS_Heuristic(MCTS):
 
         # 1. VITÓRIA IMEDIATA?
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dr, dc in directions:
+        for dr, dc in directions: 
             count = 1
             count += self._count_pieces_in_direction(board, row, col, player, dr, dc)
             count += self._count_pieces_in_direction(board, row, col, player, -dr, -dc)
 
-            if count >= 4:
-                return 10000  # Vitória!
+            if count >= 4: 
+                return 1000  # Vitória!
 
         # 2. BLOQUEIO? (verificar se oponente venceria)
         opponent = 3 - player
@@ -206,7 +224,7 @@ class MCTS_Heuristic(MCTS):
             count += self._count_pieces_in_direction(board, row, col, opponent, -dr, -dc)
 
             if count >= 3:  # Se oponente tem 3, precisa bloquear
-                return 9000
+                return 300
 
         # 3. Avaliar ameaças (3 em linha, 2 em linha)
         score = 0
@@ -235,17 +253,24 @@ class MCTS_Heuristic(MCTS):
 
         return score
 
-    def simulate(self, game_state):
+    def simulate(self, game_state, root_player):
         sim_game = game_state.copy()
         move_count = 0
-        max_moves = 50
+        max_moves = 200
 
         while move_count < max_moves:
             winner = sim_game.check_winner()
             if winner is not None:
                 break
 
-            moves = sim_game.get_valid_moves()
+            if move_count < 4:
+                if random.random() < 0.4:
+                    moves = [m for m in sim_game.get_valid_moves() if m[0] == 'drop']
+                else:
+                    moves = sim_game.get_valid_moves()
+            else:
+                moves = sim_game.get_valid_moves()
+        
             if not moves:
                 break
 
@@ -269,7 +294,7 @@ class MCTS_Heuristic(MCTS):
         if winner is None:
             return 0.5
 
-        return 1 if winner == game_state.current_player else 0
+        return 1 if winner == root_player else 0
 
 class PopOutAI:
     """Wrapper para usar MCTS no jogo"""
