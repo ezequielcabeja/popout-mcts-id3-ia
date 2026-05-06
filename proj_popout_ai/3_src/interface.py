@@ -1,15 +1,14 @@
-from shutil import move
+#from shutil import move
 
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import Prompt
 
-from mcts import MCTS # IMPORTAÇÃO DO MCTS AQUI
+from mcts import MCTS, MCTS_Heuristic 
 import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
-from train_id3 import train # IMPORTAÇÃO DO TREINO DE ID3 (SE QUISERES USAR AQUI)
+from id3_popout_dataset import predict, load_model # IMPORTAÇÃO DO TREINO DE ID3 (SE QUISERES USAR AQUI)
 import numpy as np # IMPORTAÇÃO DO NUMPY PARA PREPARAR FEATURES PARA ID3 (SE QUISERES USAR AQUI)
 import random
-from mcts import MCTS, MCTS_Heuristic
 
 from utils import GameExit
 
@@ -24,10 +23,14 @@ class GameInterface:
         self.mcts = MCTS(iterations=2000)
         self.mcts_heuristic = MCTS_Heuristic(iterations=700)
 
-        try: # TENTAR CARREGAR O MODELO ID3 TREINADO (SE EXISTIR)
-            self.id3_model = train()
+        console.print("\n[bold cyan]A carregar modelo ID3...[/bold cyan]")
+
+        try:
+            self.id3_model = load_model()
+            console.print("[bold green] ID3 ativo![/bold green]")
         except:
-            self.id3_model = None 
+            console.print("[bold yellow]ID3 indisponível ... fallback para Random[/bold yellow]")
+            self.id3_model = None
 
         self.ai_strategies = {
             "MCTS": self.mcts_ai,
@@ -40,6 +43,10 @@ class GameInterface:
         self.player_types = {}
 
        # self.ai_strategies["NovaIA"] = self.nova_funcao
+    
+    def board_to_dict(self):
+        flat = self.game.board.flatten()
+        return {f"f{i}": flat[i] for i in range(len(flat))}
 
        
     # =========================================================
@@ -144,21 +151,26 @@ class GameInterface:
         return mapping[choice]
     
     def id3_ai(self):
-
         if self.id3_model is None:
-            console.print("[red]ID3 não disponível → fallback[/red]")
             return self.random_ai()
-        
-        features = self.game.board.flatten().reshape(1, -1)
-        prediction = self.id3_model.predict(features)[0]
 
-        move_type, col = prediction.split("_")
-        col = int(col)
+        try:
+            sample = self.board_to_dict()
+            prediction = predict(self.id3_model, sample)
 
-        if (move_type, col) in self.game.get_valid_moves():
-            return (move_type, col)
-        else:
-            return random.choice(self.game.get_valid_moves())
+            move_type, col = prediction.split("_")
+            col = int(col)
+            move = (move_type, col)
+
+            if move in self.game.get_valid_moves():
+                return move
+            else:
+                console.print(f"[yellow]ID3 sugeriu inválido: {move} fallback[/yellow]")
+                return self.random_ai()
+
+        except Exception as e:
+            console.print(f"[red]Erro ID3: {e}[/red]")
+            return self.random_ai()
 
     def choose_mode(self):
         console.print("\n[bold cyan]Escolha o modo de jogo:[/bold cyan]")
@@ -183,6 +195,7 @@ class GameInterface:
 
             strategy = self.ai_strategies[ai_type]
 
+            console.print(f"[cyan]{ai_type} está a jogar...[/cyan]")
             return strategy()
         
 
@@ -237,7 +250,7 @@ class GameInterface:
                 valid_moves = self.game.get_valid_moves()
 
                 if move not in valid_moves:
-                    console.print("[yellow]Jogada inválida → fallback[/yellow]")
+                    console.print("[yellow]Jogada inválida ... fallback[/yellow]")
                     move = random.choice(valid_moves)
                # 
                 console.print(f"[bold]Jogada escolhida: {move}[/bold]")
