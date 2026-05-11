@@ -10,16 +10,7 @@ import pickle
 # 1. CARREGAMENTO
 # =========================================================
 
-df = pd.read_csv("../1_data/dataset_winner_150.csv")
-# =========================================================
-# CRIAR LABEL
-# =========================================================
-
-df["label"] = (
-    df["move_type"].astype(str)
-    + "_"
-    + df["move_col"].astype(str)
-)
+df = pd.read_csv("../1_data/dataset_popout_game_2.csv")
 
 # separar treino/teste
 df = df.sample(frac=1, random_state=42).reset_index(drop=True)
@@ -63,7 +54,7 @@ def information_gain(df, attribute, threshold, target="label"):
     )
 
 
-def id3_manual(df, attributes, target="label", depth=0, max_depth=10):
+def id3_manual(df, attributes, target="label", depth=0, max_depth=3):
 
     if len(df[target].unique()) == 1:
         return df[target].iloc[0]
@@ -129,18 +120,10 @@ def predict(tree, sample):
         return predict(branches[f"> {threshold:.2f}"], sample)
 
 
-def board_to_dict(board, current_player=1):
-    sample = {}
+def board_to_dict(board):
+    flat = board.flatten()
+    return {f"f{i}": flat[i] for i in range(len(flat))}
 
-    rows, cols = board.shape
-
-    for r in range(rows):
-        for c in range(cols):
-            sample[f"cell_{r}_{c}"] = board[r][c]
-
-    sample["current_player"] = current_player
-
-    return sample
 
 # =========================================================
 # 4. VISUALIZAÇÃO
@@ -169,13 +152,7 @@ def print_tree(tree, indent="", is_last=True):
 
 
 def train():
-    df = pd.read_csv("../1_data/dataset_winner_150.csv")
-
-    df["label"] = (
-        df["move_type"].astype(str)
-        + "_"
-        + df["move_col"].astype(str)
-    )
+    df = pd.read_csv("../1_data/dataset_popout_game_2.csv")
 
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
@@ -183,13 +160,14 @@ def train():
     train_df = df.iloc[:split_idx]
 
     features = [
-        col for col in df.columns
-        if col not in ["label", "move_type", "move_col", "winner"]
-    ]
+                col for col in df.columns
+                if col not in ["label", "winner"]
+            ]
 
     tree = id3_manual(train_df, features)
 
     return tree
+
 
 
 def save_model(tree, path="id3_model.pkl"):
@@ -204,12 +182,8 @@ if __name__ == "__main__":
 
     print("\nIniciando Treinamento ID3 (PopOut)...\n")
 
-    df = pd.read_csv("../1_data/dataset_winner_150.csv")
-    df["label"] = (
-        df["move_type"].astype(str)
-        + "_"
-        + df["move_col"].astype(str)
-    )
+    df = pd.read_csv("../1_data/dataset_popout_game_2.csv")
+
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
     split_idx = int(len(df) * 0.8)
@@ -217,9 +191,9 @@ if __name__ == "__main__":
     test_df = df.iloc[split_idx:]
 
     features = [
-            col for col in df.columns
-            if col not in ["label", "move_type", "move_col", "winner"]
-        ]
+                col for col in df.columns
+                if col not in ["label", "winner"]
+            ]
 
     tree = id3_manual(train_df, features)
 

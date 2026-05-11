@@ -6,8 +6,6 @@ import time # IMPORTAÇÃO DE TIME PARA TESTES DE TEMPO (OPCIONAL)
 import random
 from mcts import MCTS, MCTS_Heuristic
 
-def board_to_features(board):
-    return board.flatten().tolist()
 
 def generate_dataset(n_games=600):
     start = time.time() # INÍCIO DO TIMER (OPCIONAL)
@@ -45,7 +43,21 @@ def generate_dataset(n_games=600):
         
         game_data = [] # PARA ARMAZENAR AS JOGADAS DE CADA JOGO SEPARADAMENTE, SE QUISERES ANALISAR DEPOIS
         while True:
-            features = board_to_features(game.board)
+            sample = {}
+
+            # ==================================================
+            # TABULEIRO
+            # ==================================================
+
+            for r in range(game.rows):
+                for c in range(game.cols):
+                    sample[f"cell_{r}_{c}"] = game.board[r][c]
+
+            # ==================================================
+            # JOGADOR ATUAL
+            # ==================================================
+
+            sample["current_player"] = game.current_player
 
             #if random.random() < 0.7:
              #   move = mcts.get_best_move(game)
@@ -68,7 +80,12 @@ def generate_dataset(n_games=600):
 
             label = f"{move_type}_{col}"
 
-            game_data.append(features + [label])
+            row = sample.copy()
+
+            row["move_type"] = move_type
+            row["move_col"] = col
+
+            game_data.append(row)
 
             game.make_move(move_type, col)
             moves_count += 1
@@ -77,8 +94,9 @@ def generate_dataset(n_games=600):
             winner = game.check_winner(move_type)
             if winner:
                 total_moves += moves_count
-                for row in game_data: # ADICIONAR O RESULTADO DE CADA JOGO A CADA LINHA DO DATASET, PARA PODER ANALISAR DEPOIS
-                    data.append(row + [winner])
+                for row in game_data:
+                    row["winner"] = winner
+                    data.append(row)
                 
                 if winner == 1:
                     wins_p1 += 1
@@ -92,14 +110,14 @@ def generate_dataset(n_games=600):
                 total_moves += moves_count # CONTAR A JOGADA QUE LEVOU AO EMPATE
                 draws += 1
                 for row in game_data:
-                    data.append(row + [0])
+                    row["winner"] = 0
+                    data.append(row)
                 break
 
-    columns = [f"f{i}" for i in range(len(features))] + ["label", "winner"]
-    df = pd.DataFrame(data, columns=columns)
+    df = pd.DataFrame(data)
 
     #os.makedirs("1_data", exist_ok=True)
-    df.to_csv("../1_data/dataset_popout_game_2.csv", index=False)
+    df.to_csv("../1_data/dataset_popout_game_3.csv", index=False)
     print("\n------------------------------")
     print("dataset_popout_game criado!")
     print("------------------------------\n")
@@ -122,4 +140,4 @@ def generate_dataset(n_games=600):
     print(f"Empates: {draws}")
     
 if __name__ == "__main__":
-    generate_dataset(n_games=600)
+    generate_dataset(n_games=10)

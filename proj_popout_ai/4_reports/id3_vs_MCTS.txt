@@ -1,0 +1,10 @@
+RESULTADOS: ID3 vs MCTS
+========================================
+
+Jogos: 50
+Vitórias ID3: 41
+Vitórias MCTS: 9
+Empates: 0
+Win Rate ID3: 82.00%
+Média de Jogadas: 11.28
+Tempo Médio/Jogo: 69.90s

@@ -20,8 +20,8 @@ console = Console()
 class GameInterface:
     def __init__(self):
         self.game = PopOutGame()
-        self.mcts = MCTS(iterations=2000)
-        self.mcts_heuristic = MCTS_Heuristic(iterations=700)
+        self.mcts = MCTS(iterations=1000)
+        self.mcts_heuristic = MCTS_Heuristic(iterations=500)
 
         console.print("\n[bold cyan]A carregar modelo ID3...[/bold cyan]")
 
@@ -45,8 +45,18 @@ class GameInterface:
        # self.ai_strategies["NovaIA"] = self.nova_funcao
     
     def board_to_dict(self):
-        flat = self.game.board.flatten()
-        return {f"f{i}": flat[i] for i in range(len(flat))}
+
+        sample = {}
+
+        rows, cols = self.game.board.shape
+
+        for r in range(rows):
+            for c in range(cols):
+                sample[f"cell_{r}_{c}"] = self.game.board[r][c]
+
+        sample["current_player"] = self.game.current_player
+
+        return sample
 
        
     # =========================================================

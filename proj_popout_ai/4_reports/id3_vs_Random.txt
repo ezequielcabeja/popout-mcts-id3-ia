@@ -1,0 +1,10 @@
+RESULTADOS: ID3 vs Random
+========================================
+
+Jogos: 50
+Vitórias ID3: 45
+Vitórias Random: 5
+Empates: 0
+Win Rate ID3: 90.00%
+Média de Jogadas: 15.48
+Tempo Médio/Jogo: 0.00s

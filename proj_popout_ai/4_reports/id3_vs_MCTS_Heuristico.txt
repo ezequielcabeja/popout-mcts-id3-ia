@@ -1,0 +1,10 @@
+RESULTADOS: ID3 vs MCTS_Heuristico
+========================================
+
+Jogos: 50
+Vitórias ID3: 10
+Vitórias MCTS_Heuristico: 40
+Empates: 0
+Win Rate ID3: 20.00%
+Média de Jogadas: 14.38
+Tempo Médio/Jogo: 25.47s
